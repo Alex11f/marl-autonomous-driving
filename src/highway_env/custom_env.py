@@ -205,7 +205,6 @@ class MultiAgentWrapper(gymnasium.Wrapper):
             actions = [actions] * self.n_agents
         
         # --- FORCE RESTORE AGENTS ---
-        # Fix critico: highway-env tende a rimuovere agenti da controlled_vehicles se rimangono indietro.
         if hasattr(self.env.unwrapped, "controlled_vehicles"):
              active_agents = [a for a in self.agents if a in self.env.unwrapped.road.vehicles]
              for a in active_agents:

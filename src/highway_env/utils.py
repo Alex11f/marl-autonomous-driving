@@ -33,7 +33,6 @@ def _fmt_mean(values) -> str:
     return f"{float(np.mean(values)):.2f}"
 
 def _to_scalar_reward(r) -> float:
-    # highway-env tipicamente restituisce scalare; ma rendiamo robusto per safety.
     try:
         return float(r)
     except Exception:
