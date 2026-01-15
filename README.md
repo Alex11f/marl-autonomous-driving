@@ -2,7 +2,7 @@
 
 ## Setup Instructions
 
-### 1. Install System Dependencies (Linux/Ubuntu)
+### 1. Install System Dependencies
 Run the following commands in your terminal to install the required system libraries for Pygame and Highway-env:
 
 ```bash
@@ -21,15 +21,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Verify Installation
-Run the test script to ensure everything is working:
-
-```bash
-python src/test_env.py
-```
-
 ## Project Structure
-- `configs/`: Configuration files for training and environments.
 - `src/`: Source code for agents, environments, and utilities.
-- `scripts/`: Helper scripts for running experiments.
+  - `highway_env/`: using Highway-env for simulation and SB3 for reinforcement learning.
+  - `metadrive_env/`: using MetaDrive for more complex driving scenarios and RLlib for training.
 - `results/`: Output directory for logs and models.
