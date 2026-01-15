@@ -5,6 +5,14 @@ import os
 import glob
 import numpy as np
 
+
+# --- Small guide ---
+# The relative performance plot shows the normalized performance of agents in the non-crashed episodes.
+# It filters out crashed episodes, computes mean metrics per agent, normalizes them.
+#
+# In the global comparion for the distance is used the survival time, 
+# while in the agent comparison is used the actual distance traveled.
+
 # Configuration Info
 ENV_INFO = """Environment:
 - Duration: 120s
