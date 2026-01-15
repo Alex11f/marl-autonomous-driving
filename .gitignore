@@ -45,12 +45,9 @@ env/
 *.h5
 *.pth
 *.pt
-checkpoints/
-logs/
-*.log
 tensorboard/
-highway_dqn/
-results/checkpoints/
+results/checkpoints/*
+!results/checkpoints/highway_dqn/
 results/logs/
 
 # TensorBoard events
@@ -58,7 +55,10 @@ events.out.tfevents.*
 
 # Data
 *.csv
+!results/highway_dqn_results/*.csv
 *.json
+*.zip
+!results/checkpoints/highway_dqn/*.zip
 data/
 datasets/
 
@@ -71,3 +71,7 @@ Thumbs.db
 *.bak
 tmp/
 temp/
+
+
+# Legacy files
+src/highway_env/legacy/

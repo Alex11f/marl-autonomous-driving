@@ -1,7 +1,11 @@
 # Core ML/RL
-gymnasium==1.2.2
+gymnasium==1.1.1 # downgraded from the 1.2.2 due to rllib compatibility issues
 highway-env==1.10.2
 stable-baselines3==2.7.0
+ray[rllib]==2.52.1
+dm-tree==0.1.9
+pyarrow==21.0.0
+pettingzoo==1.24.3
 
 # Deep Learning
 torch==2.9.1
@@ -10,6 +14,9 @@ torch==2.9.1
 matplotlib==3.10.7
 pandas==2.3.3
 tensorboard==2.20.0
+opencv-python
 
 # Utilities
 numpy==2.2.6
+
+metadrive-simulator
