@@ -19,6 +19,8 @@ class ExperimentConfig:
     train: bool = True
     test: bool = True
 
+    dqn_policy: str = ""  # Suffix for model naming based on changes from default
+
     loading_steps: int = 0 # Step count of the model to load (0 for scratch)
     total_steps: int = 50000 # Target total steps (end of training / model to test)
     
@@ -32,7 +34,7 @@ class ExperimentConfig:
     
     dqn_params: dict = field(default_factory=lambda: dict(
         policy='MlpPolicy',
-        policy_kwargs=dict(net_arch=[256, 256]),
+        policy_kwargs=dict(net_arch=[512, 512, 512]),
         learning_rate=1e-4,
         buffer_size=50000,
         learning_starts=1000,
@@ -50,11 +52,11 @@ def get_experiment_config() -> ExperimentConfig:
     This function allows loading parameters as a standalone part.
     """
     config = ExperimentConfig(
-        mode="single",
-        train=True,
+        mode="multi-shared",
+        train=False,
         test=True,
-        loading_steps=0,
-        total_steps=50000,
+        loading_steps=100000,
+        total_steps=100000,
         test_episodes=10,
         render_test=True,
         seed=None
@@ -262,7 +264,7 @@ def train(config: ExperimentConfig):
             
     # Save models
     if config.mode == "multi-shared":
-        path = os.path.join(config.checkpoint_dir, f"{model_names[0]}_{config.total_steps}.zip")
+        path = os.path.join(config.checkpoint_dir, f"{model_names[0]}_{config.total_steps}{config.dqn_policy}.zip")
         models[0].save(path)
         print(f"Saved shared model to {path} at step {config.total_steps}")
     else:
@@ -326,6 +328,7 @@ def test(config: ExperimentConfig):
         ep_speeds = [[] for _ in range(n_agents)]
         ep_distances = [0.0] * n_agents
         start_positions = [None] * n_agents
+        agent_death_steps = [None] * n_agents  # Track when each agent dies
         
         agents_dead = set()
         crashed = [False] * n_agents
@@ -336,7 +339,7 @@ def test(config: ExperimentConfig):
         snapshot_crashed = None
         snapshot_ep_speeds = None
 
-        while not done and steps < 75:
+        while not done and steps < 30:
             actions = []
             
             if config.mode == "single":
@@ -372,20 +375,22 @@ def test(config: ExperimentConfig):
                 for i in range(n_agents):
                     ep_rewards[i] += rewards[i]
                     
-                    if i not in agents_dead:
-                        speed = info.get(f"agent_{i}_speed", 0)
-                        pos = info.get(f"agent_{i}_x", 0)
-                        
-                        ep_speeds[i].append(speed)
-                        
-                        if start_positions[i] is None:
-                            start_positions[i] = pos
-                        
-                        ep_distances[i] = pos - start_positions[i]
-                        
-                        if info.get(f"agent_{i}_crashed", False):
+                    speed = info.get(f"agent_{i}_speed", 0)
+                    pos = info.get(f"agent_{i}_x", 0)
+                    
+                    ep_speeds[i].append(speed)
+                    
+                    if start_positions[i] is None:
+                        start_positions[i] = pos
+                    
+                    # ALWAYS update distance, even after death
+                    ep_distances[i] = pos - start_positions[i]
+                    
+                    if info.get(f"agent_{i}_crashed", False):
+                        if i not in agents_dead:
                             crashed[i] = True
                             agents_dead.add(i)
+                            agent_death_steps[i] = steps  # Record when this agent died
                 
                 obs = next_obs
                 done = terminated or truncated
@@ -413,12 +418,15 @@ def test(config: ExperimentConfig):
         for i in range(n_agents):
             avg_speed = np.mean(snapshot_ep_speeds[i]) if snapshot_ep_speeds and snapshot_ep_speeds[i] else 0
             
+            # Use individual agent survival length (death step or full episode length)
+            agent_length = agent_death_steps[i] if agent_death_steps[i] is not None else min(steps, 50)
+            
             results.append({
                 "episode": ep,
                 "mode": config.mode,
                 "agent_id": i,
                 "reward": snapshot_rewards[i],
-                "length": min(steps, 50) if snapshot_rewards is not None else steps,
+                "length": agent_length,
                 "crashed": snapshot_crashed[i],
                 "avg_speed": avg_speed,
                 "distance": snapshot_distances[i],
@@ -429,7 +437,7 @@ def test(config: ExperimentConfig):
 
     # Save results to CSV
     df = pd.DataFrame(results)
-    csv_path = os.path.join(config.results_dir, f"results_{config.mode}_{config.total_steps}_{int(time.time())}.csv")
+    csv_path = os.path.join(config.results_dir, f"results_{config.mode}_{config.total_steps}{config.dqn_policy}_{int(time.time())}.csv")
     df.to_csv(csv_path, index=False)
     print(f"Results saved to {csv_path}")
     env.close()

@@ -92,17 +92,7 @@ def plot_metrics(data_list, title="Comparison", plot_type="bar", output_path=Non
     else:
         fig_width = 16
 
-    fig, axes = plt.subplots(2, 2, figsize=(fig_width, 12))
-    fig.suptitle(title, fontsize=16, y=0.98)
-        
-    # Add Info Blocks at the very top
-    fig.text(0.15, 0.98, ENV_INFO, fontsize=10, verticalalignment='top',
-             bbox=dict(facecolor='white', alpha=0.5, boxstyle='round,pad=0.8'))
-    fig.text(0.85, 0.98, MODEL_INFO, fontsize=10, verticalalignment='top', ha='right',
-             bbox=dict(facecolor='white', alpha=0.5, boxstyle='round,pad=0.8'))
-    
-    # Increase top margin significantly to clear info blocks
-    plt.subplots_adjust(top=0.78, hspace=0.4, wspace=0.3)
+    fig, axes = plt.subplots(2, 2, figsize=(fig_width, 10))
 
     metrics = [
         ("reward", "Average Reward", axes[0, 0]),
@@ -137,13 +127,15 @@ def plot_metrics(data_list, title="Comparison", plot_type="bar", output_path=Non
 
         ax.set_title(metric_title)
 
+    plt.tight_layout()
+    
     if output_path:
         plt.savefig(output_path, bbox_inches='tight')
         print(f"Plot saved to {output_path}")
         
     plt.show()
 
-def plot_agent_comparison_dots(data_list, title="Agent Comparison (Per Episode)", output_path=None):
+def plot_agent_comparison_dots(data_list, title="Agent Comparison (Per Episode)", output_path=None, aggregate_agents=False):
     """
     Plots metrics as lines with markers per episode.
     Uses specific matplotlib loop for Distance as requested.
@@ -156,17 +148,7 @@ def plot_agent_comparison_dots(data_list, title="Agent Comparison (Per Episode)"
     unique_configs = [d['label'] for d in data_list]
     
     sns.set_theme(style="whitegrid")
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-    fig.suptitle(title, fontsize=16, y=0.98)
-    
-    # Add Info Blocks at the very top
-    fig.text(0.15, 0.98, ENV_INFO, fontsize=10, verticalalignment='top',
-             bbox=dict(facecolor='white', alpha=0.5, boxstyle='round,pad=0.8'))
-    fig.text(0.85, 0.98, MODEL_INFO, fontsize=10, verticalalignment='top', ha='right',
-             bbox=dict(facecolor='white', alpha=0.5, boxstyle='round,pad=0.8'))
-    
-    # Increase top margin significantly to clear info blocks
-    plt.subplots_adjust(top=0.78, hspace=0.4, wspace=0.3)
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
 
     metrics = [
         ("reward", "Reward per Episode", axes[0, 0]),
@@ -177,47 +159,60 @@ def plot_agent_comparison_dots(data_list, title="Agent Comparison (Per Episode)"
 
     for metric, metric_title, ax in metrics:
         if metric == "performance":
-            # 1. Filter for Non-Crashed episodes
+            # Filter for Non-Crashed episodes only
             survived_df = combined_df[combined_df['crashed'] == False]
             
-            if not survived_df.empty:
-                # 2. Calculate Means grouped by Run AND Agent
-                means = survived_df.groupby(['Run', 'agent_id'])[['reward', 'distance', 'avg_speed']].mean()
-                
-                # 3. Normalize (divide by max of each metric column across all agents/runs)
-                normalized = means / means.max()
-                
-                # 4. Prepare for plotting
-                normalized = normalized.reset_index()
-                # Create a unique label for each agent in each run
-                normalized['AgentLabel'] = normalized['Run'] + " - Ag " + normalized['agent_id'].astype(str)
-                
-                melted = normalized.melt(id_vars=["AgentLabel"], value_vars=['reward', 'distance', 'avg_speed'], 
-                                         var_name="Metric", value_name="Score")
-                
-                # 5. Plot
-                sns.barplot(ax=ax, data=melted, x="Metric", y="Score", hue="AgentLabel", palette="viridis")
-                ax.axhline(1.0, color='gray', linestyle='--', linewidth=0.8)
-                ax.set_ylim(0, 1.1)
-                ax.set_ylabel("Score (Relative to Max)")
-                ax.legend(loc='lower right', fontsize='x-small')
+            if survived_df.empty:
+                ax.text(0.5, 0.5, "No Non-Crashed Episodes", ha='center', va='center', transform=ax.transAxes)
+                ax.set_title(metric_title)
+                continue
+            
+            # Calculate Means grouped by Run AND Agent
+            means = survived_df.groupby(['Run', 'agent_id'])[['reward', 'distance', 'avg_speed']].mean()
+            
+            # Normalize (divide by max of each metric column across all agents/runs)
+            normalized = means / means.max()
+            
+            # Prepare for plotting
+            normalized = normalized.reset_index()
+            # Create label: just Run name when aggregated, otherwise Run + Agent
+            if aggregate_agents:
+                normalized['AgentLabel'] = normalized['Run']
             else:
-                ax.text(0.5, 0.5, "No Non-Crashed Episodes", ha='center', va='center')
+                normalized['AgentLabel'] = normalized['Run'] + " - Ag " + normalized['agent_id'].astype(str)
+            
+            melted = normalized.melt(id_vars=["AgentLabel"], value_vars=['reward', 'distance', 'avg_speed'], 
+                                     var_name="Metric", value_name="Score")
+            
+            # Plot
+            sns.barplot(ax=ax, data=melted, x="Metric", y="Score", hue="AgentLabel", palette="viridis")
+            ax.axhline(1.0, color='gray', linestyle='--', linewidth=0.8)
+            ax.set_ylim(0, 1.1)
+            ax.set_ylabel("Score (Relative to Max)")
+            ax.legend(loc='lower right', fontsize='x-small')
 
         elif metric == "distance":
-            # Explicit matplotlib loop for distance as requested
+            # Explicit matplotlib loop for distance
             for config in unique_configs:
                 df_run = combined_df[combined_df['Run'] == config]
-                agents = sorted(df_run['agent_id'].unique())
-                for agent in agents:
-                    agent_data = df_run[df_run['agent_id'] == agent]
-                    label = f"{config} - Agent {agent}" if len(unique_configs) > 1 or len(agents) > 1 else f"Agent {agent}"
-                    ax.plot(agent_data['episode'], agent_data['distance'], label=label, marker='s', alpha=0.7)
-                    
-                    # Highlight crashes
-                    crash_data = agent_data[agent_data['crashed'] == True]
+                
+                if aggregate_agents and df_run['agent_id'].nunique() > 1:
+                    # Aggregate: average across agents per episode (crashed only if ALL agents crashed)
+                    agg_data = df_run.groupby('episode').agg({'distance': 'mean', 'crashed': 'min'}).reset_index()
+                    ax.plot(agg_data['episode'], agg_data['distance'], label=config, marker='s', alpha=0.7)
+                    crash_data = agg_data[agg_data['crashed'] == True]
                     if not crash_data.empty:
                         ax.scatter(crash_data['episode'], crash_data['distance'], color='red', marker='x', s=100, zorder=5)
+                else:
+                    # Plot each agent separately
+                    agents = sorted(df_run['agent_id'].unique())
+                    for agent in agents:
+                        agent_data = df_run[df_run['agent_id'] == agent]
+                        label = config if len(agents) == 1 else f"{config} - Agent {agent}"
+                        ax.plot(agent_data['episode'], agent_data['distance'], label=label, marker='s', alpha=0.7)
+                        crash_data = agent_data[agent_data['crashed'] == True]
+                        if not crash_data.empty:
+                            ax.scatter(crash_data['episode'], crash_data['distance'], color='red', marker='x', s=100, zorder=5)
 
             ax.set_xlabel("Episode")
             ax.set_ylabel("Distance (m)")
@@ -225,20 +220,28 @@ def plot_agent_comparison_dots(data_list, title="Agent Comparison (Per Episode)"
             ax.grid(True)
             
         else:
-            # Explicit loop for Reward and Speed to avoid CI shadows and ensure clear dot-lines
+            # Explicit loop for Reward and Speed
             for config in unique_configs:
                 df_run = combined_df[combined_df['Run'] == config]
-                agents = sorted(df_run['agent_id'].unique())
-                for agent in agents:
-                    agent_data = df_run[df_run['agent_id'] == agent]
-                    label = f"{config} - Agent {agent}" if len(unique_configs) > 1 or len(agents) > 1 else f"Agent {agent}"
-                    marker = 'o' if metric == 'reward' else '^' # Circle for reward, Triangle for speed
-                    ax.plot(agent_data['episode'], agent_data[metric], label=label, marker=marker, alpha=0.7)
-                    
-                    # Highlight crashes
-                    crash_data = agent_data[agent_data['crashed'] == True]
+                marker = 'o' if metric == 'reward' else '^'
+                
+                if aggregate_agents and df_run['agent_id'].nunique() > 1:
+                    # Aggregate: average across agents per episode (crashed only if ALL agents crashed)
+                    agg_data = df_run.groupby('episode').agg({metric: 'mean', 'crashed': 'min'}).reset_index()
+                    ax.plot(agg_data['episode'], agg_data[metric], label=config, marker=marker, alpha=0.7)
+                    crash_data = agg_data[agg_data['crashed'] == True]
                     if not crash_data.empty:
                         ax.scatter(crash_data['episode'], crash_data[metric], color='red', marker='x', s=100, zorder=5)
+                else:
+                    # Plot each agent separately
+                    agents = sorted(df_run['agent_id'].unique())
+                    for agent in agents:
+                        agent_data = df_run[df_run['agent_id'] == agent]
+                        label = config if len(agents) == 1 else f"{config} - Agent {agent}"
+                        ax.plot(agent_data['episode'], agent_data[metric], label=label, marker=marker, alpha=0.7)
+                        crash_data = agent_data[agent_data['crashed'] == True]
+                        if not crash_data.empty:
+                            ax.scatter(crash_data['episode'], crash_data[metric], color='red', marker='x', s=100, zorder=5)
 
             ax.set_xlabel("Episode")
             ax.legend()
@@ -246,6 +249,8 @@ def plot_agent_comparison_dots(data_list, title="Agent Comparison (Per Episode)"
             
         ax.set_title(metric_title)
 
+    plt.tight_layout()
+    
     if output_path:
         plt.savefig(output_path, bbox_inches='tight')
         print(f"Plot saved to {output_path}")

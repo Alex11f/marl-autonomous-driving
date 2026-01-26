@@ -198,6 +198,12 @@ class MultiAgentWrapper(gymnasium.Wrapper):
         self.agents = self.env.unwrapped.controlled_vehicles[:]
         self.n_agents = len(self.agents)
         self.dones = set()
+        
+        # Provide initial positions in info so test code can record spawn locations
+        for i, vehicle in enumerate(self.agents):
+            info[f"agent_{i}_x"] = vehicle.position[0]
+            info[f"agent_{i}_speed"] = vehicle.speed
+        
         return obs, info
         
     def step(self, actions):
@@ -264,6 +270,13 @@ class MultiAgentWrapper(gymnasium.Wrapper):
             is_crashed = vehicle.crashed
             is_offroad = (self.env.unwrapped.config["offroad_terminal"] and not vehicle.on_road)
             
+            # ALWAYS log position and speed (even for crashed agents)
+            info[f"agent_{i}_speed"] = vehicle.speed
+            info[f"agent_{i}_x"] = vehicle.position[0]
+            info[f"agent_{i}_lane"] = vehicle.lane_index[2]
+            if hasattr(vehicle, "target_lane_index"):
+                info[f"agent_{i}_target_lane"] = vehicle.target_lane_index[2]
+            
             if is_crashed or is_offroad:
                 # Change color to red to indicate crash/death
                 vehicle.color = (200, 0, 50)
@@ -286,14 +299,6 @@ class MultiAgentWrapper(gymnasium.Wrapper):
                 reward = self.env.unwrapped._reward(action=actions[i])
                 rewards.append(reward)
                 agents_dones.append(False)
-                
-                # Debug info per problemi nel cambio corsia
-                info[f"agent_{i}_lane"] = vehicle.lane_index[2]
-                # Se il veicolo ha un target lane (es. sta cambiando corsia), lo logghiamo
-                if hasattr(vehicle, "target_lane_index"):
-                    info[f"agent_{i}_target_lane"] = vehicle.target_lane_index[2]
-                info[f"agent_{i}_speed"] = vehicle.speed
-                info[f"agent_{i}_x"] = vehicle.position[0]
 
         self.env.unwrapped.vehicle = original_vehicle
         info["agents_dones"] = agents_dones
