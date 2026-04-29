@@ -23,6 +23,7 @@ pip install -r requirements.txt
 
 ## Project Structure
 - `src/`: Source code for agents, environments, and utilities.
-  - `highway_env/`: using Highway-env for simulation and SB3 for reinforcement learning.
-  - `metadrive_env/`: using MetaDrive for more complex driving scenarios and RLlib for training.
-- `results/`: Output directory for logs and models.
+  - `highway_env/`: Using Highway-env for simulation and SB3 for reinforcement learning (DQN).
+  - `metadrive_env/`: Using MetaDrive for more complex driving scenarios and RLlib for training (PPO).
+- `results/highway_dqn_results/`: Contains generated performance graphs (.png) and benchmark data (.csv). Model checkpoints are excluded from the repository to keep it lightweight.
+- `configs/`: Configuration files for environment setups.

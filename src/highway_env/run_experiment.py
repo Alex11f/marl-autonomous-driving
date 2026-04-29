@@ -15,6 +15,10 @@ from utils import _epsilon
 
 @dataclass
 class ExperimentConfig:
+    """
+    Configuration for reinforcement learning experiments in Highway-env.
+    Supports single-agent, multi-independent, and multi-shared agent modes.
+    """
     mode: str = "single"  # Options: "single", "multi-independent", "multi-shared"
     train: bool = True
     test: bool = True
@@ -68,9 +72,10 @@ def get_experiment_config() -> ExperimentConfig:
     
     return config
 
-# ----------------------------
-
 def get_env(config: ExperimentConfig, render_mode="rgb_array"):
+    """
+    Initializes and returns the environment based on the experiment configuration.
+    """
     env_config = ENV_CONFIG.copy()
     env_config["duration"] = 75 
     
@@ -105,10 +110,13 @@ def load_model(config: ExperimentConfig, env, model_name: str, steps: int) -> DQ
             print(f"Error loading {path}: {e}")
             return None
     else:
-        # print(f"Checkpoint {path} not found.")
         return None
 
 def train(config: ExperimentConfig):
+    """
+    Executes the training loop for the reinforcement learning agent(s).
+    Supports training from scratch or resuming from a checkpoint.
+    """
     env, n_agents = get_env(config)
     print(f"--- Starting Training: {config.mode} ---")
     
@@ -278,6 +286,10 @@ def train(config: ExperimentConfig):
 
 
 def test(config: ExperimentConfig):
+    """
+    Evaluates the performance of the trained reinforcement learning agent(s).
+    Records metrics such as rewards, speeds, distances, and crash rates.
+    """
     env, n_agents = get_env(config, render_mode="human" if config.render_test else "rgb_array")
     print(f"--- Starting Testing: {config.mode} (Target Model: {config.total_steps} steps) ---")
     
@@ -443,6 +455,10 @@ def test(config: ExperimentConfig):
     env.close()
 
 def main():
+    """
+    Main entry point for running experiments.
+    Loads the configuration and executes training and/or testing phases.
+    """
     config = get_experiment_config()
     
     if config.train:

@@ -23,8 +23,12 @@ from metadrive.envs.marl_envs import MultiAgentMetaDrive
 
 @dataclass
 class ExperimentConfig:
+    """
+    Configuration for reinforcement learning experiments using MetaDrive and RLlib.
+    Supports single and multi-agent scenarios with PPO.
+    """
     # Experiment Mode
-    mode: str = "multi"  # "single" or "multi"
+    mode: str = "multi"  # Options: "single" or "multi"
     train: bool = True
     test: bool = True
     resume: bool = True # Resume from latest checkpoint if available
@@ -52,6 +56,7 @@ class ExperimentConfig:
     results_dir: str = os.path.abspath("results/rllib_metadrive")
     
     def __post_init__(self):
+        """Logic to execute after dataclass initialization."""
         if self.mode == "single":
             self.n_agents = 1
         
@@ -59,19 +64,21 @@ class ExperimentConfig:
         os.makedirs(self.results_dir, exist_ok=True)
 
 def get_experiment_config() -> ExperimentConfig:
-    # You can modify defaults here or use argument parsing
+    """
+    Returns the configuration for the MetaDrive experiment.
+    """
     return ExperimentConfig(
-        mode="single", # Change to 'single' for single agent
+        mode="single",
         train=True,
         test=True,
-        resume=True, # Resume from latest checkpoint if available
+        resume=True,
         n_agents=2,
-        total_steps=500_000, # This defines ADDITIONAL steps. 500k prev + 500k new = 1M total.
+        total_steps=500_000,
         start_seed=5000,
-        num_scenarios=50, # Train on multiple scenarios for generalization
-        test_episodes=10, # Explicitly set test episodes
+        num_scenarios=50,
+        test_episodes=10,
         traffic_density=0.1,
-        num_workers=1 # Parallel workers
+        num_workers=1
     )
 
 # --- UTILS ---
@@ -108,6 +115,9 @@ def get_latest_checkpoint(experiment_path, experiment_name):
 # --- ENVIRONMENT WRAPPER ---
 
 class RLLibMetaDriveWrapper(MultiAgentEnv):
+    """
+    Wrapper class to make MetaDrive MultiAgent environment compatible with RLlib.
+    """
     def __init__(self, env_config):
         super().__init__()
         # Create a copy to avoid modifying the original config used by Ray
@@ -125,24 +135,29 @@ class RLLibMetaDriveWrapper(MultiAgentEnv):
         self._agent_ids = set(self.env.agents.keys())
 
     def reset(self, *, seed=None, options=None):
-        # MetaDrive handles seeding via config, but we can pass seed if needed
-        # Note: MetaDrive's reset typically doesn't take 'options'
+        """Resets the environment."""
         obs, info = self.env.reset(seed=seed)
         return obs, info
 
     def step(self, action_dict):
+        """Performs a step in the environment."""
         obs, rewards, terminateds, truncateds, infos = self.env.step(action_dict)
         return obs, rewards, terminateds, truncateds, infos
 
     def render(self):
+        """Renders the environment."""
         return self.env.render(mode="top_down", film_size=(800, 800))
         
     def close(self):
+        """Closes the environment."""
         self.env.close()
 
 # --- TRAIN & TEST FUNCTIONS ---
 
 def train(config: ExperimentConfig):
+    """
+    Executes the training process using RLlib's PPO algorithm.
+    """
     print(f"--- Starting Training: {config.mode} Agent(s) ---")
     print(f"Map Config: {config.num_scenarios} scenario(s) starting at seed {config.start_seed}")
 
@@ -239,6 +254,9 @@ def train(config: ExperimentConfig):
 
 
 def test(config: ExperimentConfig):
+    """
+    Evaluates the trained agent(s) performance in the MetaDrive environment.
+    """
     print(f"--- Starting Testing: {config.mode} Agent(s) ---")
     print(f"Test Episodes: {config.test_episodes}")
     
@@ -360,6 +378,9 @@ def test(config: ExperimentConfig):
             print(f"Results saved to {csv_path}")
 
 def main():
+    """
+    Main entry point for running MetaDrive/RLlib experiments.
+    """
     # Optimization for Ray memory
     os.environ["RAY_memory_usage_threshold"] = "0.99"
     ray.init(ignore_reinit_error=True, include_dashboard=False)
