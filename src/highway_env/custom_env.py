@@ -11,8 +11,8 @@ from highway_env.vehicle.controller import ControlledVehicle
 
 class RLVehicle(ControlledVehicle):
     def act(self, action: dict | str = None) -> None:
-        # Override per forzare il cambio corsia basandosi sugli indici del grafo,
-        # bypassando i controlli geometrici di next_lane che a volte falliscono.
+        # Override to force the lane change using graph indices,
+        # bypassing the geometric checks of next_lane that sometimes fail.
         if action == "LANE_RIGHT":
             _from, _to, _id = self.target_lane_index
             target = _id + 1
@@ -27,9 +27,9 @@ class RLVehicle(ControlledVehicle):
                 self.target_lane_index = (_from, _to, target)
         else:
             super().act(action)
-            # Fix: Impediamo che l'auto vada in retromarcia (target_speed < 0)
-            # Se l'agente spamma "SLOWER", la velocità target non deve scendere sotto 0
-            # DA NON UTILIZZARE IN ENVIROMENT COME PARKING
+            # Fix: Prevent the car from going in reverse (target_speed < 0)
+            # If the agent spam "SLOWER", the target speed should not go below 0
+            # NOT TO BE USED IN ENVIROMENTS LIKE PARKING
             if self.target_speed < 0:
                 self.target_speed = 0
 
@@ -87,9 +87,9 @@ ENV_CONFIG = {
 
 class HybridDrivingEnv(gymnasium.Env):
     """
-    Ambiente ibrido che alterna Highway -> Merge -> Roundabout CONTINUAMENTE.
-    Senza interruzioni tra i scenari.
-    Ora supporta una configurazione personalizzata per il multi-agente.
+    Hybrid environment that alternates Highway -> Merge -> Roundabout CONTINUOUSLY.
+    No interruption between scenarios.
+    Now supports custom configuration for multi-agent.  
     """
     
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 15}
@@ -102,7 +102,7 @@ class HybridDrivingEnv(gymnasium.Env):
         self.scenario_configs = [
             ("highway-fast-v0", {}),
             ("merge-v0", {"duration": 100}),
-            ("roundabout-v0", {"duration": 100}) # Al momento non funziona bene, non si interrompe l'episodio se si esce dalla rotonda
+            ("roundabout-v0", {"duration": 100}) # For now it doesn't work well, the episode doesn't end if you exit the roundabout
         ]
         
         self.current_scenario_idx = 0
@@ -116,10 +116,10 @@ class HybridDrivingEnv(gymnasium.Env):
         self.action_space = self.env.action_space
         
     def _create_current_env(self):
-        """Chiude il vecchio ambiente e ne crea uno nuovo pulito, applicando la configurazione utente."""
+        """Close the old environment and create a new clean one, applying the user configuration."""
         if self.env is not None:
             self.env.close()
-            time.sleep(0.1)  # Dai tempo a Pygame di chiudere
+            time.sleep(0.1)  # Give Pygame time to close
             
         env_id, base_config = self.scenario_configs[self.current_scenario_idx]
         
@@ -128,7 +128,7 @@ class HybridDrivingEnv(gymnasium.Env):
             "observation": {"type": "Kinematics"},
             "action": {"type": "DiscreteMetaAction"},
         })
-        # Applica la configurazione passata dall'utente (es. per multi-agente)
+        # Apply the configuration passed by the user (e.g. for multi-agent)
         full_config.update(self.user_config)
         
         self.env = gymnasium.make(env_id, render_mode=self.render_mode, config=full_config)
@@ -140,33 +140,33 @@ class HybridDrivingEnv(gymnasium.Env):
         obs, reward, done, truncated, info = self.env.step(action)
         self.step_counter += 1
         
-        # Se l'auto è fuori strada in roundabout, forza il cambio scenario
-        if self.current_scenario_idx == 2:  # Se siamo in roundabout
-            # In multi-agent, obs è una tupla, prendiamo l'osservazione del primo agente
+        # If the car is out of the road in roundabout, force the scenario change
+        if self.current_scenario_idx == 2:  # If we are in roundabout
+            # In multi-agent, obs is a tuple, take the observation of the first agent
             agent_obs = obs[0] if isinstance(obs, (list, tuple)) else obs
             position = agent_obs[0, 0] if len(agent_obs.shape) > 1 else agent_obs[0]
             if position > 5:
-                print("Auto fuori dalla rotonda! Cambio scenario.")
+                print("Car out of the roundabout! Scenario change.")
                 self.step_counter = self.steps_per_scenario
     
-        # Cambia scenario SENZA interrompere l'episodio
+        # Scenario change WITHOUT interrupting the episode
         if self.step_counter >= self.steps_per_scenario:
             self.step_counter = 0
             self.current_scenario_idx = (self.current_scenario_idx + 1) % len(self.scenario_configs)
             
-            print(f"\n--- Cambio scenario a: {self.scenario_configs[self.current_scenario_idx][0]} ---")
+            print(f"\n--- Scenario change to: {self.scenario_configs[self.current_scenario_idx][0]} ---")
             obs, info = self._create_current_env()
-            # L'episodio CONTINUA, non finisce
+            # The episode CONTINUES, it doesn't end
             done = False
             truncated = False
             
         return obs, reward, done, truncated, info
     
     def reset(self, seed=None, options=None):
-        # Reset totale (solo all'inizio dell'episodio principale)
+        # Total reset (only at the beginning of the main episode)
         self.current_scenario_idx = np.random.randint(len(self.scenario_configs))
         self.step_counter = 0
-        print(f"--- Inizio con scenario: {self.scenario_configs[self.current_scenario_idx][0]} ---")
+        print(f"--- Starting with scenario: {self.scenario_configs[self.current_scenario_idx][0]} ---")
         obs, info = self._create_current_env()
         return obs, info
     
@@ -183,8 +183,8 @@ class HybridDrivingEnv(gymnasium.Env):
 
 class MultiAgentWrapper(gymnasium.Wrapper):
     """
-    Wrapper per gestire più veicoli controllati indipendentemente.
-    Accetta tuple di azioni e le applica ai veicoli controllati.
+    Wrapper to manage multiple independently controlled vehicles.
+    Accepts action tuples and applies them to controlled vehicles.
     """
     def __init__(self, env):
         super().__init__(env)
@@ -194,7 +194,7 @@ class MultiAgentWrapper(gymnasium.Wrapper):
 
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
-        # Salviamo i riferimenti ai veicoli all'inizio dell'episodio
+        # Save references to vehicles at the beginning of the episode
         self.agents = self.env.unwrapped.controlled_vehicles[:]
         self.n_agents = len(self.agents)
         self.dones = set()
@@ -228,28 +228,28 @@ class MultiAgentWrapper(gymnasium.Wrapper):
                 print(f"WARNING: Agent {v} (ID: {id(v)}) not found in self.agents! Fallback to IDLE.")
                 mapped_actions.append(1) # Fallback IDLE
 
-        # 1. & 2. Delega la simulazione (azioni + fisica) all'ambiente interno
-        # Questo gestisce correttamente MultiAgentAction e l'integrazione fisica
+        # 1. & 2. Delegate simulation (actions + physics) to the internal environment
+        # This correctly handles MultiAgentAction and physical integration
         self.env.unwrapped._simulate(tuple(mapped_actions))
         
-        # 3. Ottieni e ALLINEA le osservazioni
-        # highway-env restituisce obs solo per i veicoli vivi
+        # 3. Get and ALIGN observations
+        # highway-env returns obs only for live vehicles
         raw_obs = self.env.unwrapped.observation_type.observe()
         current_vehicles = self.env.unwrapped.controlled_vehicles
         aligned_obs = []
         
         for vehicle in self.agents:
             if vehicle in current_vehicles:
-                # Il veicolo è vivo, prendiamo la sua osservazione
-                # Usiamo l'indice REALE in controlled_vehicles per pescare l'osservazione corretta
+                # The vehicle is alive, let's take its observation
+                # Use the REAL index in controlled_vehicles to pick the correct observation
                 real_idx = current_vehicles.index(vehicle)
                 if isinstance(raw_obs, (list, tuple)):
                     aligned_obs.append(raw_obs[real_idx])
                 else:
                     aligned_obs.append(raw_obs[real_idx])
             else:
-                # Il veicolo è morto/rimosso. Inseriamo osservazione vuota (zeri) per mantenere la shape.
-                # Usiamo raw_obs[0] come template per la shape se disponibile, altrimenti fallback (5,5)
+                # The vehicle is dead/removed. Insert empty observation (zeros) to maintain the shape.
+                # Use raw_obs[0] as template for the shape if available, otherwise fallback (5,5)
                 if len(raw_obs) > 0:
                     aligned_obs.append(np.zeros_like(raw_obs[0]))
                 else:
@@ -260,7 +260,7 @@ class MultiAgentWrapper(gymnasium.Wrapper):
         else:
             obs = np.array(aligned_obs)
 
-        # 4. Info, Reward e Termination
+        # 4. Info, Reward and Termination
         info = self.env.unwrapped._info(obs, action=actions)
         truncated = self.env.unwrapped._is_truncated()
         rewards = []
@@ -313,14 +313,14 @@ class MultiAgentWrapper(gymnasium.Wrapper):
 
 class CustomHighwayEnv(HighwayEnv):
     """
-    HighwayEnv con spawn controllato dei veicoli ego (multi-agent).
+    HighwayEnv with controlled ego vehicle spawning (multi-agent).
     """
 
     def _create_vehicles(self) -> None:
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
         ego_vehicle_type = RLVehicle
         
-        # Configurazione posizionamento
+        # Configuration of positioning
         ego_pos = self.config.get("ego_initial_pos", 100.0)
         
         # 1) Spawn EGO vehicles
@@ -342,15 +342,15 @@ class CustomHighwayEnv(HighwayEnv):
             self.controlled_vehicles.append(vehicle)
             self.road.vehicles.append(vehicle)
 
-        # 2) VEICOLI VELOCI (prima degli ego < ego_pos)
+        # 2) FAST VEHICLES (before ego < ego_pos)
         n_fast = 10
         for _ in range(n_fast):
             lane = self.np_random.choice(lanes)
-            # Posizione casuale dietro
+            # Random position behind
             long_pos = self.np_random.uniform(0, max(10, ego_pos - 30))
             
             position = lane.position(long_pos, 0)
-            # Check collisioni
+            # Check collisions
             if any(np.linalg.norm(v.position - position) < 10.0 for v in self.road.vehicles):
                 continue
                 
@@ -361,7 +361,7 @@ class CustomHighwayEnv(HighwayEnv):
             v.randomize_behavior()
             self.road.vehicles.append(v)
 
-        # 3) ALTRI VEICOLI (dopo gli ego)
+        # 3) OTHER VEHICLES (after ego)
         remaining_vehicles = self.config["vehicles_count"] - len(self.controlled_vehicles) - n_fast
         
         for _ in range(remaining_vehicles):
@@ -382,7 +382,7 @@ class CustomHighwayEnv(HighwayEnv):
 
 
 class SingleAgentStubEnv(gymnasium.Env):
-    """Env fittizio a singolo agente, usato solo per inizializzare DQN."""
+    """Fake single-agent environment, used only to initialize DQN."""
     metadata = {"render_modes": []}
 
     def __init__(self, obs_space, act_space):

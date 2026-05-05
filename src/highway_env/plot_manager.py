@@ -7,15 +7,10 @@ from plotting_utils import load_data, plot_metrics, plot_agent_comparison_dots
 FILE_GROUPS = {
     "all_steps": {
         "Single 50k": "results_single_50000_1768404543.csv",
-        # "Single 100k": "results_single_1768343914.csv",
         "Single 100k": "results_single_100000_2.csv",
-        # "Shared 50k": "results_multi-shared_1768337662.csv",
         "Shared 50k": "results_multi-shared_50000_2.csv",
-        # "Shared 100k": "results_multi-shared_100000_1768390911.csv",
         "Shared 100k": "results_multi-shared_100000_3.csv",
-        # "Indep 50k": "results_multi-independent_1768341042.csv",
         "Indep 50k": "results_multi-independent_50000_2.csv",
-        # "Indep 100k": "results_multi-independent_1768347379.csv",
         "Indep 100k": "results_multi-independent_100000_2.csv",
     },
     "comparison_50k": {
@@ -38,7 +33,6 @@ FILE_GROUPS = {
         "Shared 100k": "results_multi-shared_100000_3.csv",
     },
     "indep_100k": {
-        # "Indep 100k": "results_multi-independent_1768347379.csv",
         "Indep 100k": "results_multi-independent_100000_2.csv",
     },
     "shared_vs_indep_100k": {
